@@ -65,24 +65,31 @@ namespace kp {
     }
 
     struct Params {
-        std::vector<double> line_widths{ 72 };  // line i uses line_widths[min(i, size-1)]
-        double tolerance = 1.0;               // largest adjustment ratio accepted in the first pass
-        double line_penalty = 10;             // added to every line's badness; favours fewer lines
-        double flagged_demerits = 3000;       // two flagged breaks in a row
-        double fitness_demerits = 3000;       // adjacent lines whose fitness classes differ by more than one
+        std::vector<double> line_widths{ 72 };  // line i uses line_widths[0], the second uses line_widths[1], the final width is then repeated
+        double tolerance = 1.0;               // max adjustment ratio accepted in the first normal pass thorough
+        double line_penalty = 10;             // added to every line's badness
+        double flagged_demerits = 10000;       // added when two consecutive lines both end at a flagged
+        double fitness_demerits = 10000;       // adjacent lines whose fitness classes differ by more than one
+        // is there is no solution within the 'tolerance' limit, it will
+        // run with unlimited stretch and over fill lines instead of failing
+        bool allow_emergency = true; 
     };
 
     struct Line {
-        std::size_t start;  // first item of the line
-        std::size_t end;    // index of the break item; the line holds items [start, end)
-        double ratio;       // adjustment ratio: <0 shrink, >0 stretch
-        bool overfull;      // could not be made to fit (emergency pass only)
+        /* the line contains items [start, end]
+        * item end is the penalty/glue where the break occurs
+        */
+        std::size_t start;
+        std::size_t end;  
+
+        double ratio;       // adjustment ratio: <0 shrink, >0 stretch. how much the glue had to stretch/shrink
+        bool overfull;      // true if the line is wider than its target width and can be overfilled.
     };
 
     struct Result {
         std::vector<Line> lines;
         double demerits = 0;     // total demerits of the chosen breaks
-        bool emergency = false;  // true if the first pass (with `tolerance`) found no solution
+        bool emergency = false;
     };
 
     // First item of the line that begins after a break at b: the break item itself
