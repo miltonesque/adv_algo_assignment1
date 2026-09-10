@@ -1,36 +1,50 @@
-// The caller describes a paragraph as a list of boxes, glue and penalties;
-// break_lines() returns the set of breakpoints with minimum total demerits.
-//
-// Requirements on the item list:
-//   * it must end with a forced break (a penalty <= -INF_PENALTY);
-//   * glue must satisfy shrink <= width (a space cannot become negative).
+//Knuth-Plass Line Breaking algorithm
+
+/*
+* A paragraph is designed as a sequence of:
+* - boxes: these are fixed width text
+* - glues: these are spaces that can stretch or shrink
+* - penalities: these are possible places where a line can end
+*/
+
 #pragma once
 
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <limits>
+#include <map>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace kp {
 
-    // A penalty >= INF_PENALTY forbids a break; a penalty <= -INF_PENALTY forces one.
+    // A penalty this large means that a break is FORBIDDEN
+    // a penalty this negative means that a break is REQUIRED
     constexpr double INF_PENALTY = 10000.0;
-    // Badness is capped here, as in TeX, so "infinitely bad" lines stay comparable.
+
+    // Badness is capped here, so extremely bad lines do not complicate the calculation
     constexpr double MAX_BADNESS = 10000.0;
 
-    enum class Kind { Box, Glue, Penalty };
+    //the stretch of the "fill" glue that will end a paragraph so the last line can be short without being penalised.
+    constexpr double FILL_STRETCH = 1e9;
+
+    enum class Kind { 
+        Box, 
+        Glue, 
+        Penalty 
+    };
 
     struct Item {
         Kind kind;
-        double width = 0;      // box: fixed width; glue: natural width; penalty: width added if we break here
+        double width = 0;      // box: width of the text; glue: natural width of the space; penalty: extra width that is used if we break here
         double stretch = 0;    // glue only
         double shrink = 0;     // glue only
         double penalty = 0;    // penalty only
-        bool flagged = false;  // penalty only: a "hyphen" break (consecutive ones cost extra)
-        std::string text;      // box: content; penalty: what to print at the end of the line if we break here
+        
+        std::string text;      // this is text that is printed out when the penalty is used as a break
     };
 
     inline Item box(double w, std::string text) { return { Kind::Box, w, 0, 0, 0, false, std::move(text) }; }
