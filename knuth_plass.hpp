@@ -42,15 +42,26 @@ namespace kp {
         double width = 0;      // box: width of the text; glue: natural width of the space; penalty: extra width that is used if we break here
         double stretch = 0;    // glue only
         double shrink = 0;     // glue only
-        double penalty = 0;    // penalty only
-        
+        double penalty = 0;    // penalty only     
         std::string text;      // this is text that is printed out when the penalty is used as a break
     };
 
-    inline Item box(double w, std::string text) { return { Kind::Box, w, 0, 0, 0, false, std::move(text) }; }
-    inline Item glue(double w, double stretch, double shrink) { return { Kind::Glue, w, stretch, shrink, 0, false, "" }; }
-    inline Item penalty(double w, double p, bool flagged, std::string text = "") {
-        return { Kind::Penalty, w, 0, 0, p, flagged, std::move(text) };
+    //below are helper functions to construct items
+    inline Item box(double width, const std::string& text) { 
+        return { Kind::Box, width, 0, 0, 0, text };
+    }
+    inline Item glue(double width, double stretch, double shrink) { 
+        return { Kind::Glue, width, stretch, shrink, 0, "" }; 
+    }
+    inline Item penalty(double width, double value, std::string text = "") {
+        return { Kind::Penalty, width, 0, 0, value, text };
+    }
+
+    //appending the standard paragraph ending:
+    inline void end_paragraph(std::vector<Item>& items) {
+        items.push_back(penalty(0, INF_PENALTY)); //no break before the fill glue
+        items.push_back(glue(0, FILL_STRETCH, 0)); //lets last line be as short as it needs
+        items.push_back(penalty(0, -INF_PENALTY)); //a forced final break
     }
 
     struct Params {
