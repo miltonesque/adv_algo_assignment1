@@ -234,6 +234,55 @@ namespace kp {
 
             return demerits;
         }
+
+        //finding out whether item (i) is a possible line break
+
+        bool is_breakpoint(const std::vector<Item>& items, std::size_t i)
+        {
+            const Item& item = items[i];
+
+            // a penalty is a ALWAYS a possible break unless forbidden
+            if (item.type == Type::Penalty) {
+                return item.penalty < INF_PENALTY;
+            }
+
+            //glue reps space, you can break after space if previous item is a box (word)
+            return item.type == Type::Glue &&
+                i > 0 &&
+                items[i - 1].type == Type::Box;
+        }
+
+        bool is_forced(const Item& item)
+        {
+            return item.type == Type::Penalty &&
+                item.penalty <= -INF_PENALTY;
+        }
+
+
+        inline bool is_flagged(const Item& item)
+        {
+            return item.type == Type::Penalty && item.width > 0;
+        }
+
+        //return the target width for a particular line
+        inline double line_width(const Params& params, int line_number)
+        {
+            std::size_t index =
+                std::min<std::size_t>(
+                    static_cast<std::size_t>(line_number),
+                    params.line_widths.size() - 1);
+
+            return params.line_widths[index];
+        }
+
+        // Two states at the same break with different line numbers are only
+        // interchangeable once both are past the last distinct line width.
+        inline std::size_t width_class (const Params& params, int line_number)
+        {
+            return std::min<std::size_t>(
+                static_cast<std::size_t>(line_number),
+                params.line_widths.size() - 1);
+        }
         
     }
 
