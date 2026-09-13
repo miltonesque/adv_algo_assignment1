@@ -115,11 +115,11 @@ namespace kp {
             std::size_t start;  // index of first item of the line that follows this break
             int line_number;           // number of lines ended at this break
             int fitness;        // this describes how loose/tight the lie is: 0 tight, 1 decent, 2 loose, 3 very loose
-            bool flagged;       // was this break a flagged penalty?
             double ratio;       // adjustment ratio of the line that ends here
-            double total;       // total demerits from the paragraph start to here
-            int prev;           // index of the previous break
+            double demerits;       // total demerits from the paragraph start to here
+            bool flagged;       // was this break a flagged penalty?
             bool overfull;
+            int prev;           // index of the previous break
         };
 
         /* using prefix sums here to calculate the width of any interval in O(1)
@@ -283,7 +283,256 @@ namespace kp {
                 static_cast<std::size_t>(line_number),
                 params.line_widths.size() - 1);
         }
-        
+
+/* Find the optimal line breaks using dynamic programming.
+Each state represents the best known way of reaching a particular break position with a particular fitness class.
+For every possible break:
+    1. Try every previous state.
+    2. Check whether the resulting line fits.
+    3. Calculate the line's demerits.
+    4. Keep the cheapest state for that (break, fitness) pair.
+Finally, follow the `previous` pointers backwards to reconstruct the optimal solution. */
+
+
+// go through one ne pass of the algorithm.  returns the index of the best final state, or -1 if no solution was found.
+        inline int run_pass(
+            const std::vector<Item>& items,
+            const PrefixSums& sums,
+            const Params& params,
+            double tolerance,
+            bool emergency,
+            std::vector<State>& states)
+        {
+            states.clear();
+
+            // State 0 is the start of the paragraph.
+            states.push_back({
+                0, 0, 0, 1, 0.0, 0.0, false, false, -1
+                });
+
+            // active contains the states that can still produce future lines.
+            std::vector<int> active{ 0 };
+
+            for (std::size_t b = 0; b < items.size(); ++b) {
+
+                if (!is_breakpoint(items, b)) {
+                    continue;
+                }
+
+                const Item& break_item = items[b];
+                const bool forced = is_forced(break_item);
+
+                // Best candidate per (fitness, width class).
+                std::map<std::pair<int, std::size_t>, State> best;
+
+                std::vector<int> still_active;
+
+                // Node deactivated here that is used in emergency mode to force progress when nothing else fits.
+                int rescue = -1;
+
+                for (int s : active) {
+                    const State& prev = states[s];
+                    const std::size_t start = prev.start;
+
+                    if (start > b) {
+                        // Line would be empty; keep the node for later.
+                        still_active.push_back(s);
+                        continue;
+                    }
+
+                    const double width =
+                        line_width(params, prev.line_number);
+
+                    const double ratio =
+                        adjustment_ratio(items, sums, start, b, width);
+
+                    // The line only gets wider as b advances, so a node whose line is already too long can never be used again.  After a forced break, no earlier node may be used either.
+                    const bool deactivate = ratio < -1.0 || forced;
+
+                    if (!deactivate) {
+                        still_active.push_back(s);
+                    }
+
+                    if (ratio < -1.0) {
+                        // Prefer the most recent node, so only the overfull material overflows.
+                        if (emergency &&
+                            (rescue == -1 ||
+                                prev.start > states[rescue].start ||
+                                (prev.start == states[rescue].start &&
+                                    prev.demerits < states[rescue].demerits))) {
+                            rescue = s;
+                        }
+                        continue;
+                    }
+
+                    if (ratio > tolerance) {
+                        continue;
+                    }
+
+                    const int fitness = fitness_class(ratio);
+
+                    double total =
+                        prev.demerits +
+                        line_demerits(ratio, break_item, params);
+
+                    if (std::abs(fitness - prev.fitness) > 1) {
+                        total += params.fitness_demerits;
+                    }
+
+                    const bool flagged = is_flagged(break_item);
+
+                    if (flagged && prev.flagged) {
+                        total += params.flagged_demerits;
+                    }
+
+                    State candidate{
+                        b,
+                        line_start_after(items, b),
+                        prev.line_number + 1,
+                        fitness,
+                        ratio,
+                        total,
+                        flagged,
+                        false,
+                        s
+                    };
+
+                    auto key = std::make_pair(
+                        fitness,
+                        width_class(params, candidate.line_number));
+
+                    auto it = best.find(key);
+
+                    if (it == best.end() ||
+                        candidate.demerits < it->second.demerits) {
+                        best[key] = candidate;
+                    }
+                }
+
+                // Emergency: every path is now overfull.  Break here anyway from the cheapest dead node, producing an overfull line.
+                if (emergency &&
+                    best.empty() &&
+                    still_active.empty() &&
+                    rescue != -1) {
+
+                    const State& prev = states[rescue];
+
+                    const double ratio =
+                        adjustment_ratio(
+                            items, sums, prev.start, b,
+                            line_width(params, prev.line_number));
+
+                    State candidate{
+                        b,
+                        line_start_after(items, b),
+                        prev.line_number + 1,
+                        0,
+                        ratio,
+                        prev.demerits +
+                        line_demerits(ratio, break_item, params),
+                        is_flagged(break_item),
+                        true,
+                        rescue
+                    };
+
+                    best[{ 0, width_class(params, candidate.line_number) }] =
+                        candidate;
+                }
+
+                for (const auto& entry : best) {
+                    states.push_back(entry.second);
+                    still_active.push_back(
+                        static_cast<int>(states.size() - 1));
+                }
+
+                active = std::move(still_active);
+
+                if (active.empty()) {
+                    return -1;
+                }
+            }
+
+            // The paragraph ends with a forced break, so every surviving node sits on the final item.  Pick the cheapest.
+            int best_final = -1;
+
+            for (int s : active) {
+                if (states[s].break_position != items.size() - 1) {
+                    continue;
+                }
+
+                if (best_final == -1 ||
+                    states[s].demerits < states[best_final].demerits) {
+                    best_final = s;
+                }
+            }
+
+            return best_final;
+        }
+
     }
 
-}  // namespace kp
+
+    inline Result break_lines(
+        const std::vector<Item>& items,
+        const Params& params = {})
+    {
+        if (items.empty()) {
+            throw std::invalid_argument(
+                "paragraph cannot be empty");
+        }
+
+        if (params.line_widths.empty()) {
+            throw std::invalid_argument(
+                "at least one line width is required");
+        }
+
+        if (!detail::is_forced(items.back())) {
+            throw std::invalid_argument(
+                "paragraph must end with a forced break");
+        }
+
+        /* states are stored in a vector so the previous states can be reffered to by the integer index */
+        detail::PrefixSums sums(items);
+        std::vector<detail::State> states;
+
+        Result result;
+
+        int best = detail::run_pass(
+            items, sums, params, params.tolerance, false, states);
+
+        if (best == -1 && params.allow_emergency) {
+            result.emergency = true;
+
+            best = detail::run_pass(
+                items, sums, params,
+                std::numeric_limits<double>::infinity(),
+                true, states);
+        }
+
+        if (best == -1) {
+            throw std::runtime_error(
+                "no valid line breaking found");
+        }
+
+        result.demerits = states[best].demerits;
+
+        while (states[best].prev != -1) {
+            const detail::State& current = states[best];
+            const detail::State& previous = states[current.prev];
+
+            result.lines.push_back({
+                previous.start,
+                current.break_position,
+                current.ratio,
+                current.overfull
+                });
+
+            best = current.prev;
+        }
+
+        std::reverse(result.lines.begin(), result.lines.end());
+
+        return result;
+    }
+
+}
