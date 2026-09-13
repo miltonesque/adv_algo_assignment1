@@ -31,14 +31,14 @@ namespace kp {
     //the stretch of the "fill" glue that will end a paragraph so the last line can be short without being penalised.
     constexpr double FILL_STRETCH = 1e9;
 
-    enum class Kind { 
+    enum class Type { 
         Box, 
         Glue, 
         Penalty 
     };
 
     struct Item {
-        Kind kind;
+        Type type;
         double width = 0;      // box: width of the text; glue: natural width of the space; penalty: extra width that is used if we break here
         double stretch = 0;    // glue only
         double shrink = 0;     // glue only
@@ -48,13 +48,13 @@ namespace kp {
 
     //below are helper functions to construct items
     inline Item box(double width, const std::string& text) { 
-        return { Kind::Box, width, 0, 0, 0, text };
+        return { Type::Box, width, 0, 0, 0, text };
     }
     inline Item glue(double width, double stretch, double shrink) { 
-        return { Kind::Glue, width, stretch, shrink, 0, "" }; 
+        return { Type::Glue, width, stretch, shrink, 0, "" }; 
     }
     inline Item penalty(double width, double value, std::string text = "") {
-        return { Kind::Penalty, width, 0, 0, value, text };
+        return { Type::Penalty, width, 0, 0, value, text };
     }
 
     //appending the standard paragraph ending:
@@ -98,7 +98,7 @@ namespace kp {
     */
     inline std::size_t line_start_after(const std::vector<Item>& items, std::size_t break_position) {
         std::size_t i = break_position + 1;
-        while (i < items.size() && items[i].kind != Kind::Box) {
+        while (i < items.size() && items[i].type != Type::Box) {
             ++i;
         }
         return i;
@@ -121,6 +121,79 @@ namespace kp {
             int prev;           // index of the previous break
             bool overfull;
         };
+
+        /* using prefix sums here to calculate the width of any interval in O(1)
+        */
+        struct PrefixSums {
+            /*
+            * width[i] = total box/glue width in [0,i)
+            * stretch[i] = total stretchability in [0, i)
+            * shrink[i]  = total shrinkability in [0, i)
+            */
+            std::vector<double> width;
+            std::vector<double> stretch;
+            std::vector<double> shrink;
+
+            explicit PrefixSums(const std::vector<Item>& items)
+                : width(items.size() + 1, 0),
+                stretch(items.size() + 1, 0),
+                shrink(items.size() + 1, 0)
+            {
+                for (std::size_t i = 0; i < items.size(); ++i) {
+                    width[i + 1] = width[i];
+                    stretch[i + 1] = stretch[i];
+                    shrink[i + 1] = shrink[i];
+
+                    if (items[i].type != Type::Penalty) {
+                        width[i + 1] += items[i].width;
+                        stretch[i + 1] += items[i].stretch;
+                        shrink[i + 1] += items[i].shrink;
+                    }
+                }
+            }
+        };
+
+        double natural_width(const std::vector<Item>& items, const PrefixSums& sums, std::size_t start, std::size_t end) {
+            double result = sums.width[end] - sums.width[start];
+
+            // a penalty only has a width if it is used as a break
+            if (items[end].type == Type::Penalty) {
+                result += items[end].width;
+            }
+            return result;
+        }
+
+        // ratio > 0 : glue must stretch
+        // ratio < 0 : glue must shrink
+        inline double adjustment_ratio(
+            const std::vector<Item>& items, const PrefixSums& sums, std::size_t start, std::size_t end, double target_width)
+        {
+            double width = natural_width(items, sums, start, end);
+
+            if (width < target_width) {
+                double available_stretch =
+                    sums.stretch[end] - sums.stretch[start];
+
+                if (available_stretch <= 0) {
+                    return std::numeric_limits<double>::infinity();
+                }
+
+                return (target_width - width) / available_stretch;
+            }
+
+            if (width > target_width) {
+                double available_shrink =
+                    sums.shrink[end] - sums.shrink[start];
+
+                if (available_shrink <= 0) {
+                    return -std::numeric_limits<double>::infinity();
+                }
+
+                return (target_width - width) / available_shrink;
+            }
+
+            return 0;
+        }
         
     }
 
