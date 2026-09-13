@@ -194,6 +194,46 @@ namespace kp {
 
             return 0;
         }
+
+        //determining the fitness class of a line
+        inline int fitness_class(double ratio)
+        {
+            if (ratio < -0.5) 
+                return 0;
+            if (ratio <= 0.5) 
+                return 1;
+            if (ratio <= 1.0) 
+                return 2;
+            return 3;
+        }
+
+        //calculating the cost of adding one line.
+
+        // this is the objective function being minimised by the dynamic program.
+        inline double line_demerits(
+            double ratio,
+            const Item& break_item,
+            const Params& params)
+        {
+            double badness =
+                std::min(100.0 * std::pow(std::abs(ratio), 3), MAX_BADNESS);
+
+            double value = params.line_penalty + badness;
+            double demerits = value * value;
+
+            if (break_item.type == Type::Penalty) {
+                double p = break_item.penalty;
+
+                if (p >= 0) {
+                    demerits += p * p;
+                }
+                else if (p > -INF_PENALTY) {
+                    demerits -= p * p;
+                }
+            }
+
+            return demerits;
+        }
         
     }
 
