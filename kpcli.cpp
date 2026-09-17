@@ -41,11 +41,19 @@ struct Options {
     "how to use: ./kpcli [options] [INPUTFILE] \n"
     "\n"
     "options:\n"
-    "  -w N, --width N\n"
-    "  -a MODE, --align MODE\n"
-    "  --greedy\n"
-    "  --stats\n"
-    "  -h, --help\n";
+    "  -w N, --width N        line width (default is 70)\n"
+    "  -a MODE, --align MODE  left | right | center | justify \n"
+    "  --greedy               use greedy line breaking \n"
+    "  --stats                printing statistics to the stderr\n"
+    "  -h, --help             showing the help!\n"
+    "INPUTFILE may be '-' or removed to read standard input.\n";
+
+    void usage_error(const std::string& message)
+    {
+        std::cerr << "kpcli: " << message << '\n';
+        std::cerr << USAGE;
+        std::exit(2);
+    }
 
     Options parse_argument(int arg_count, char** arg_vector) {
 
@@ -57,6 +65,19 @@ struct Options {
             if (argument == "-h" || argument == "--help") {
                 std::cout << USAGE;
                 std::exit(0);
+            }
+
+            if (argument == "-w" || argument == "--width") {
+                std::string value = arg_vector[++i];
+                char* end = nullptr;
+
+                long width =
+                    std::strtol(value.c_str(), &end, 10);
+
+                if (*end != '\0' || width <= 0) {
+                    usage_error("invalid width, width has to be a positive number");
+                }
+
             }
         }
         return options;
