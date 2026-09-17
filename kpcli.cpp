@@ -37,16 +37,15 @@ struct Options {
     std::string inputfile; //if empty it will read standard input
 };
 
-    const char* USAGE =
-    "how to use: ./kpcli [options] [INPUTFILE] \n"
-    "\n"
-    "options:\n"
-    "  -w N, --width N        line width (default is 70)\n"
-    "  -a MODE, --align MODE  left | right | center | justify \n"
-    "  --greedy               use greedy line breaking \n"
-    "  --stats                printing statistics to the stderr\n"
-    "  -h, --help             showing the help!\n"
-    "INPUTFILE may be '-' or removed to read standard input.\n";
+const char* USAGE =
+"how to use: ./kpcli [options] [INPUTFILE] \n"
+"\n"
+"options:\n"
+"  -w N, --width N        line width (default is 70)\n"
+"  -a MODE, --align MODE  left | right | center | justify \n"
+"  --greedy               use greedy line breaking \n"
+"  --stats                printing statistics to the stderr\n"
+"  -h, --help             showing the help!\n";
 
     void usage_error(const std::string& message)
     {
@@ -77,8 +76,52 @@ struct Options {
                 if (*end != '\0' || width <= 0) {
                     usage_error("invalid width, width has to be a positive number");
                 }
+                continue;
 
             }
+
+            if (argument == "-a" || argument == "--align") {
+                std::string mode = arg_vector[++i];
+
+                std::string mode = arg_vector[++i];
+
+                if (mode == "left") {
+                    options.align = Align::Left;
+                }
+                else if (mode == "right") {
+                    options.align = Align::Right;
+                }
+                else if (mode == "center") {
+                    options.align = Align::Center;
+                }
+                else if (mode == "justify") {
+                    options.align = Align::Justify;
+                }
+                else {
+                    usage_error("unknown alignment: " + mode);
+                }
+                continue;
+            }
+
+            if (argument.empty() || argument[0] != '-' || argument == "-") {
+
+                if (!options.inputfile.empty()) {
+                    usage_error("more than one input file given");
+                }
+
+                options.inputfile =
+                    argument == "-" ? "" : argument;
+
+                if (argument.empty()) {
+                    usage_error("empty filename");
+                }
+
+                continue;
+            }
+
+            usage_error(
+                "unknown option: " + argument);
+
         }
         return options;
     }
