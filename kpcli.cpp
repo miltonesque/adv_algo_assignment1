@@ -21,6 +21,23 @@
 #include <vector>
 
 int main() {
+
+    enum class Align {
+        Left,
+        Right,
+        Center,
+        Justify
+    };
+
+    struct Options {
+        int width = 70;
+        Align align = Align::Left;
+
+        bool greedy = false;
+        bool stats = false;
+
+        std::string inputfile; //if empty it will read standard input
+    };
 	std::vector<kp::Item> items;
 
     items.push_back(kp::box(3, "The"));
