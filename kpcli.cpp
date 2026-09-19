@@ -20,32 +20,34 @@
 #include <string>
 #include <vector>
 
-enum class Align {
-    Left,
-    Right,
-    Center,
-    Justify
-};
+namespace {
 
-struct Options {
-    int width = 70;
-    Align align = Align::Left;
+    enum class Align {
+        Left,
+        Right,
+        Center,
+        Justify
+    };
 
-    bool greedy = false;
-    bool stats = false;
+    struct Options {
+        int width = 70;
+        Align align = Align::Left;
 
-    std::string inputfile; //if empty it will read standard input
-};
+        bool greedy = false;
+        bool stats = false;
 
-const char* USAGE =
-"how to use: ./kpcli [options] [INPUTFILE] \n"
-"\n"
-"options:\n"
-"  -w N, --width N        line width (default is 70)\n"
-"  -a MODE, --align MODE  left | right | center | justify \n"
-"  --greedy               use greedy line breaking \n"
-"  --stats                printing statistics to the stderr\n"
-"  -h, --help             showing the help!\n";
+        std::string inputfile; //if empty it will read standard input
+    };
+
+    const char* USAGE =
+        "how to use: ./kpcli [options] [INPUTFILE] \n"
+        "\n"
+        "options:\n"
+        "  -w N, --width N        line width (default is 70)\n"
+        "  -a MODE, --align MODE  left | right | center | justify \n"
+        "  --greedy               use greedy line breaking \n"
+        "  --stats                printing statistics to the stderr\n"
+        "  -h, --help             showing the help!\n";
 
     void usage_error(const std::string& message)
     {
@@ -125,6 +127,68 @@ const char* USAGE =
         }
         return options;
     }
+
+    int text_width(const std::string& text)
+    {
+        return static_cast<int>(text.size());
+    }
+
+    std::vector<kp::Item> make_items(const std::vector<std::string>& words) {
+
+        std::vector<kp::Item> items;
+        
+        for (std::size_t i = 0;
+            i < words.size();
+            ++i) {
+
+            if (i > 0) {
+                // A normal space has width 1 and can stretch by 1.
+                items.push_back(kp::glue(1, 1, 0));
+            }
+
+            items.push_back(
+                kp::box(text_width(words[i]), words[i]));
+        }
+
+        kp::end_paragraph(items);
+        return items;
+    }
+
+
+    void format_paragraph(
+        const std::vector<std::string>& words,
+        const Options& options,
+        int paragraph_number,
+        int& total_lines,
+        int& total_overfull,
+        double& total_slack_squared) 
+    
+    {
+        if (words.empty()) {
+            return;
+        }
+
+        std::vector<kp::Item> items = make_items(words);
+        
+        std::vector<kp::Line> lines;
+        double demerits = 0;
+        bool emergency = false;
+
+        kp::Params params;
+
+        params.line_widths = {
+            static_cast<double>(options.width)
+        };
+
+        kp::Result result = kp::break_lines(items, params);
+
+        lines = result.lines;
+        demerits = result.demerits;
+        emergency = result.emergency;
+
+    }
+
+}
 
 int main(int arg_count, char** arg_vector) {
 
