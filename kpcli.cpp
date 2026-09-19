@@ -154,14 +154,57 @@ namespace {
         return items;
     }
 
+    std::string render_line(
+        const std::vector<kp::Item>& items,
+        const kp::Line& line,
+        bool last_line,
+        Align alignment,
+        int width) {
+
+        std::vector<std::string> words;
+        std::string current_word;
+
+        for (std::size_t i = line.start; i < line.end; i++) {
+
+            const kp::Item& item = items[i];
+
+            if (item.type == kp::Type::Box) {
+                current_word += item.text;
+            }
+            else if (item.type == kp::Type::Glue) {
+                if (!current_word.empty()) {
+                    words.push_back(current_word);
+                    current_word.clear();
+                }
+            }
+        }
+
+        if (!current_word.empty()) {
+            words.push_back(current_word);
+        }
+
+        const kp::Item& break_item = items[line.end]; //penalties can add text to the end of the line
+
+        if (break_item.type == kp::Type::Penalty && !break_item.text.empty()) {
+
+            if (words.empty()) {
+                words.push_back(break_item.text);
+            }
+            else {
+                words.back() += break_item.text;
+            }
+        }
+
+        if (words.empty()) {
+            return "";
+        }
+    }
+
 
     void format_paragraph(
         const std::vector<std::string>& words,
         const Options& options,
-        int paragraph_number,
-        int& total_lines,
-        int& total_overfull,
-        double& total_slack_squared) 
+        int paragraph_number) 
     
     {
         if (words.empty()) {
@@ -187,6 +230,9 @@ namespace {
         emergency = result.emergency;
 
     }
+
+    void format_stream(std::istream& input, const Options& options);
+
 
 }
 
