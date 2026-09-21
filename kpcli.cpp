@@ -82,6 +82,11 @@ namespace {
 
             }
 
+            if (argument == "--greedy") {
+                options.greedy = true;
+                continue;
+            }
+
             if (argument == "-a" || argument == "--align") {
                 std::string mode = arg_vector[++i];
 
@@ -152,6 +157,67 @@ namespace {
 
         kp::end_paragraph(items);
         return items;
+    }
+
+    std::vector<kp::Line> greedy_break(const std::vector<kp::Item>& items, int width) {
+
+        std::vector<kp::Line> lines;
+        std::size_t start = 0;
+
+        while (start < items.size()) {
+            double current_width = 0;
+
+            //if no break found yet
+            std::size_t best_break = items.size();
+
+            for (std::size_t i = start; i < items.size(); ++i) {
+
+                const kp::Item& item = items[i];
+
+                //if forcing a break, the paragraph is ended
+                if (item.type == kp::Type::Penalty && item.penalty <= -kp::INF_PENALTY) {
+
+                    //only taking the rbeak if the text fits so far or if there is no previous break to fall back on
+                    if (current_width <= width || best_break == items.size()) {
+                        best_break = i;
+                    }
+                    break;
+                }
+
+                //need  to check BEFORE adding the glue, a space at a break is thrown away and does not count
+                if (item.type == kp::Type::Glue && i > 0 && items[i - 1].type == kp::Type::Box) {
+
+                    if (current_width <= width || best_break == items.size()) {
+                        // either it fits, or this is the first break
+                        // after an over-long word: take the breakpoint!
+                        best_break = i;
+                    }
+
+                    if (current_width > width) {
+                        break;
+                    }
+                }
+
+                if (item.type != kp::Type::Penalty) {
+                    current_width += item.width;
+                }
+            }
+
+            lines.push_back({
+                start,
+                best_break,
+                0,
+                false
+                });
+
+            if (items[best_break].type == kp::Type::Penalty && items[best_break].penalty <= -kp::INF_PENALTY) {
+                break;
+            }
+
+            start = kp::line_start_after(items, best_break);
+        }
+
+        return lines;
     }
 
     std::string render_line(
@@ -263,18 +329,22 @@ namespace {
         double demerits = 0;
         bool emergency = false;
 
-        kp::Params params;
+        if (options.greedy) {
+            lines = greedy_break(items, options.width);
+        }
+        else {
+            kp::Params params;
 
-        params.line_widths = {
-            static_cast<double>(options.width)
-        };
+            params.line_widths = {
+                static_cast<double>(options.width)
+            };
 
-        kp::Result result = kp::break_lines(items, params);
+            kp::Result result = kp::break_lines(items, params);
 
-        lines = result.lines;
-        demerits = result.demerits;
-        emergency = result.emergency;
-
+            lines = result.lines;
+            demerits = result.demerits;
+            emergency = result.emergency;
+        }
     }
 
     void format_stream(std::istream& input, const Options& options);
