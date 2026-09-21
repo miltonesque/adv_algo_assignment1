@@ -19,6 +19,8 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <sstream>
+#include <fstream>
 
 namespace {
 
@@ -87,6 +89,11 @@ namespace {
                 continue;
             }
 
+            if (argument == "--stats") {
+                options.stats = true;
+                continue;
+            }
+
             if (argument == "-a" || argument == "--align") {
                 std::string mode = arg_vector[++i];
 
@@ -133,11 +140,13 @@ namespace {
         return options;
     }
 
+    //one character occupies one terminal column
     int text_width(const std::string& text)
     {
         return static_cast<int>(text.size());
     }
 
+    //converts the words into boxes and glue
     std::vector<kp::Item> make_items(const std::vector<std::string>& words) {
 
         std::vector<kp::Item> items;
@@ -159,6 +168,10 @@ namespace {
         return items;
     }
 
+    //greedy implementation
+    /*
+    * at each step it will take the longest line that fits.
+    */
     std::vector<kp::Line> greedy_break(const std::vector<kp::Item>& items, int width) {
 
         std::vector<kp::Line> lines;
@@ -316,8 +329,10 @@ namespace {
     void format_paragraph(
         const std::vector<std::string>& words,
         const Options& options,
-        int paragraph_number) 
-    
+        int paragraph_number,
+        int& total_lines,
+        int& total_overfull,
+        double& total_slack)
     {
         if (words.empty()) {
             return;
@@ -345,10 +360,52 @@ namespace {
             demerits = result.demerits;
             emergency = result.emergency;
         }
+
+        if (options.stats) {
+            std::cerr << "paragraph " << paragraph_number << ":\n";
+        }
+
+
     }
 
-    void format_stream(std::istream& input, const Options& options);
+    void format_stream(std::istream& input, const Options& options) {
 
+        std::vector<std::string> words;
+
+        bool first_paragraph = true;
+        int paragraph_number = 0;
+
+        int total_lines = 0;
+        int total_overfull = 0;
+
+        double total_slack = 0;
+
+        std::string line;
+
+        while (std::getline(input, line)) {
+            std::istringstream stream(line);
+
+            std::string word;
+            bool blank = true;
+
+            while (stream >> word) {
+                words.push_back(word);
+                blank = false;
+            }
+
+            if (blank && !words.empty()) {
+                if (!first_paragraph) {
+                    std::cout << '\n';
+                }
+                ++paragraph_number;
+
+                format_paragraph(words, options, paragraph_number, total_lines, total_overfull, total_slack);
+
+                words.clear();
+                first_paragraph = false;
+            }
+        }
+    }
 
 }
 
