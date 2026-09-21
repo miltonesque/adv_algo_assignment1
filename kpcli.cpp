@@ -198,6 +198,52 @@ namespace {
         if (words.empty()) {
             return "";
         }
+
+        int natural_width = 0;
+
+        for (const std::string& word : words) {
+            natural_width += text_width(word);
+        }
+
+        int gaps = static_cast<int>(words.size()) - 1;
+
+        natural_width += gaps;
+
+        int extra = std::max(0, width - natural_width);
+
+        bool justify = alignment == Align::Justify && !last_line && gaps > 0;
+
+        std::string result;
+
+        //shifting entire alignment to the right
+        if (alignment == Align::Right) {
+            result.append(extra, ' ');
+        }
+
+        //center alignment is about half extra space before the line
+        if (alignment == Align::Center) {
+            result.append(extra / 2, ' ');
+        }
+
+        for (int i = 0; i < static_cast<int>(words.size()); ++i) {
+
+            result += words[i];
+
+            if (i == gaps) {
+                break;
+            }
+
+            int spaces = 1;
+
+            //need to dritribute columns as equally as possible. if extra space can't
+            //be divided, remainder will go to gaps later
+            if (justify) {
+                spaces += ((i + 1) * extra) / gaps - (i * extra) / gaps;
+            }
+            
+            result.append(spaces, ' ');
+        }
+        return result;
     }
 
 
