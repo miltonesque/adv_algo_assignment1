@@ -405,6 +405,28 @@ namespace {
                 first_paragraph = false;
             }
         }
+
+        if (!words.empty()) {
+            if (!first_paragraph) {
+                std::cout << '\n';
+            }
+            ++paragraph_number;
+            format_paragraph(words, options, paragraph_number, total_lines, total_overfull, total_slack);
+
+        }
+
+        if (options.stats) {
+            std::cerr << "total: " << paragraph_number << " paragraph(s), " << total_lines << " line(s)\n";
+
+            std::cerr << "sum of slack: " << total_slack << '\n';
+
+            if (total_overfull > 0) {
+                
+                std::cerr << "overfull lines: " << total_overfull << '\n';
+            }
+
+        }
+
     }
 
 }
