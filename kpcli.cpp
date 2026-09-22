@@ -365,6 +365,15 @@ namespace {
             std::cerr << "paragraph " << paragraph_number << ":\n";
         }
 
+        //need to out each formatted line of text, test it against the specified width and maybe also print stats about each line
+
+        //loop through every element in lines
+        //check if the current line is the last line
+        //call render lines to turn words into formatted string
+        //calculate width uses and unused space/slack
+        //print formatted line to terminal
+        //should track overfull lines and how many lines used (maybe write which line is overfull in the line stats)
+        //output line stats as well that keep all ratios and slack if this option is used
 
     }
 
