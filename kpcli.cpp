@@ -150,7 +150,7 @@ namespace {
     std::vector<kp::Item> make_items(const std::vector<std::string>& words) {
 
         std::vector<kp::Item> items;
-        
+
         for (std::size_t i = 0;
             i < words.size();
             ++i) {
@@ -319,10 +319,16 @@ namespace {
             if (justify) {
                 spaces += ((i + 1) * extra) / gaps - (i * extra) / gaps;
             }
-            
+
             result.append(spaces, ' ');
         }
         return result;
+    }
+
+    //count the columns that are used by a line
+    int line_width(const std::string& text)
+    {
+        return text_width(text);
     }
 
 
@@ -339,7 +345,7 @@ namespace {
         }
 
         std::vector<kp::Item> items = make_items(words);
-        
+
         std::vector<kp::Line> lines;
         double demerits = 0;
         bool emergency = false;
@@ -369,13 +375,53 @@ namespace {
 
         //loop through every element in lines
         //check if the current line is the last line
-        //call render lines to turn words into formatted string
-        //calculate width uses and unused space/slack
-        //print formatted line to terminal
-        //should track overfull lines and how many lines used (maybe write which line is overfull in the line stats)
-        //output line stats as well that keep all ratios and slack if this option is used
+
+        for (std::size_t i = 0; i < lines.size(); i++) {
+            bool last_line = (i + 1) == lines.size();
+
+            //call render lines to turn words into formatted string
+            std::string output = render_line(items, lines[i], last_line, options.align, options.width);
+
+            //calculate width uses and unused space / slack
+            int actual_width = line_width(output);
+
+            //print formatted line to terminal
+            //should track overfull lines and how many lines used (maybe write which line is overfull in the line stats)
+            //output line stats as well that keep all ratios and slack if this option is used
+            int slack = options.width - actual_width;
+
+            bool overfull = slack < 0;
+
+            std::cout << output << '\n';
+
+            ++total_lines;
+
+            if (overfull) {
+                ++total_overfull;
+            }
+            else if (!last_line) {
+                total_slack += slack * slack;
+            }
+
+            if (options.stats) {
+                std::cerr << "  line " << (i + 1) << ": " << actual_width << "/" << options.width;
+
+                if (!options.greedy) {
+                    std::cerr << "  ratio " << lines[i].ratio;
+                }
+
+                std::cerr << "  slack " << slack;
+
+                if (overfull) {
+                    std::cerr << "  OVERFULL";
+                }
+
+                std::cerr << '\n';
+            }
+        }
 
     }
+}
 
     void format_stream(std::istream& input, const Options& options) {
 
