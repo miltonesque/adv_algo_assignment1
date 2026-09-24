@@ -65,7 +65,7 @@ namespace kp {
     }
 
     struct Params {
-        std::vector<double> line_widths{ 72 };  // line i uses line_widths[0], the second uses line_widths[1], the final width is then repeated
+        std::vector<double> line_widths{ 70 };  // line i uses line_widths[0], the second uses line_widths[1], the final width is then repeated
         double tolerance = 1.0;               // max adjustment ratio accepted in the first normal pass thorough
         double line_penalty = 10;             // added to every line's badness
         double flagged_demerits = 10000;       // added when two consecutive lines both end at a flagged

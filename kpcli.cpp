@@ -21,6 +21,9 @@
 #include <vector>
 #include <sstream>
 #include <fstream>
+#include <istream>
+#include <exception>
+#include <cstdlib>
 
 namespace {
 
@@ -95,8 +98,6 @@ namespace {
             }
 
             if (argument == "-a" || argument == "--align") {
-                std::string mode = arg_vector[++i];
-
                 std::string mode = arg_vector[++i];
 
                 if (mode == "left") {
@@ -484,34 +485,32 @@ namespace {
 
     }
 
-}
-
 int main(int arg_count, char** arg_vector) {
 
     Options options = parse_argument(arg_count, arg_vector);
 
-	std::vector<kp::Item> items;
+    try {
+        if (options.inputfile.empty()) {
+            format_stream(std::cin, options);
+            return 0;
+        }
 
-    items.push_back(kp::box(3, "The"));
-    items.push_back(kp::glue(1, 1, 0));
-    items.push_back(kp::box(6, "simple"));
-    items.push_back(kp::glue(1, 1, 0));
-    items.push_back(kp::box(5, "tests"));
+        std::ifstream input(options.inputfile);
 
-    kp::end_paragraph(items);
+        if (!input) {
+            std::cerr << "kpcli: cannot open " << options.inputfile << '\n';
 
-    kp::Params params;
-    params.line_widths = { 20 };
+            return 1;
+        }
 
-    kp::Result result =
-        kp::break_lines(items, params);
+        format_stream(input, options);
+    }
 
-    std::cout << "lines: "
-        << result.lines.size()
-        << '\n';
+    catch (const std::exception& error) {
+        std::cerr << "kpcli: " << error.what() << '\n';
 
-    std::cout << "demerits: "
-        << result.demerits
-        << '\n';
+        return 1;
+    }
+    return 0;
 
 }
