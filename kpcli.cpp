@@ -432,6 +432,10 @@ namespace {
             }
         }
 
+        if (options.stats && !options.greedy) {
+            std::cerr << "  demerits: " << demerits << (emergency ? "  (emergency pass)" : "") << '\n';
+        }
+
     }
 }
 
