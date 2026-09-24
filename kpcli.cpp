@@ -74,15 +74,22 @@ namespace {
             }
 
             if (argument == "-w" || argument == "--width") {
+
+                if (i + 1 >= arg_count) {
+                    usage_error("missing value for " + argument);
+                }
+
                 std::string value = arg_vector[++i];
                 char* end = nullptr;
 
-                long width =
-                    std::strtol(value.c_str(), &end, 10);
+                long width = std::strtol(value.c_str(), &end, 10);
 
                 if (*end != '\0' || width <= 0) {
                     usage_error("invalid width, width has to be a positive number");
                 }
+
+                options.width = static_cast<int>(width);
+
                 continue;
 
             }
@@ -99,6 +106,10 @@ namespace {
 
             if (argument == "-a" || argument == "--align") {
                 std::string mode = arg_vector[++i];
+
+                if (i + 1 >= arg_count) {
+                    usage_error("missing alignment mode");
+                }
 
                 if (mode == "left") {
                     options.align = Align::Left;
