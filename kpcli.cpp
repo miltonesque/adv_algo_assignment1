@@ -61,6 +61,7 @@ namespace {
         std::exit(2);
     }
 
+    //parses command line arguments and converts them into an Option
     Options parse_argument(int arg_count, char** arg_vector) {
 
         Options options;
@@ -73,6 +74,7 @@ namespace {
                 std::exit(0);
             }
 
+            //width requires a value in the next commad line argument
             if (argument == "-w" || argument == "--width") {
 
                 if (i + 1 >= arg_count) {
@@ -82,6 +84,7 @@ namespace {
                 std::string value = arg_vector[++i];
                 char* end = nullptr;
 
+                //strtol give you the ability to detect values that are not integers
                 long width = std::strtol(value.c_str(), &end, 10);
 
                 if (*end != '\0' || width <= 0) {
@@ -153,6 +156,7 @@ namespace {
     }
 
     //one character occupies one terminal column
+    //returns the number of terminal columns occupied by a string
     int text_width(const std::string& text)
     {
         return static_cast<int>(text.size());
@@ -176,6 +180,7 @@ namespace {
                 kp::box(text_width(words[i]), words[i]));
         }
 
+        //paragraph ending penalty --> forced breakpoint at the end
         kp::end_paragraph(items);
         return items;
     }
@@ -227,7 +232,7 @@ namespace {
                     current_width += item.width;
                 }
             }
-
+            //store the slected range, break is excluded from the line and will be handled by render_line
             lines.push_back({
                 start,
                 best_break,
@@ -235,16 +240,20 @@ namespace {
                 false
                 });
 
+            //once paragraph ending has been chosen then the paragraph is complete
             if (items[best_break].type == kp::Type::Penalty && items[best_break].penalty <= -kp::INF_PENALTY) {
                 break;
             }
 
+            //you can move past the breakpoint and its associated glue
             start = kp::line_start_after(items, best_break);
         }
 
         return lines;
     }
 
+    //converts one line from the box/glue representation into a final printable string
+    //alignment is also handled here because rendering will decide how any available space is used.
     std::string render_line(
         const std::vector<kp::Item>& items,
         const kp::Line& line,
@@ -255,6 +264,7 @@ namespace {
         std::vector<std::string> words;
         std::string current_word;
 
+        //reconstructing the words in a line by joining consecutive box items and using the glue as a space
         for (std::size_t i = line.start; i < line.end; i++) {
 
             const kp::Item& item = items[i];
@@ -290,6 +300,7 @@ namespace {
             return "";
         }
 
+        //calculating the natural width before any alignment has been added
         int natural_width = 0;
 
         for (const std::string& word : words) {
@@ -300,6 +311,8 @@ namespace {
 
         natural_width += gaps;
 
+        //any amount of unused space that is available on the line
+        //using max means that alignment will not try to remove any spaces if the line is already full
         int extra = std::max(0, width - natural_width);
 
         bool justify = alignment == Align::Justify && !last_line && gaps > 0;
@@ -343,7 +356,8 @@ namespace {
         return text_width(text);
     }
 
-
+    //formats a paragraph using either knuth plass or greedy
+    //also includes stats that are passed by so that format(stream)can report the totals across all paragraphs
     void format_paragraph(
         const std::vector<std::string>& words,
         const Options& options,
@@ -356,6 +370,7 @@ namespace {
             return;
         }
 
+        //building the box, glue, penalty representation used
         std::vector<kp::Item> items = make_items(words);
 
         std::vector<kp::Line> lines;
@@ -438,7 +453,7 @@ namespace {
 
     }
 }
-
+    //reads the input stream and will group words
     void format_stream(std::istream& input, const Options& options) {
 
         std::vector<std::string> words;
@@ -459,11 +474,13 @@ namespace {
             std::string word;
             bool blank = true;
 
+            //automatically treats consecutive whtiespaces are sepaators, multiple spaces in input are normalised
             while (stream >> word) {
                 words.push_back(word);
                 blank = false;
             }
 
+            //if the input is blank line, terminates the current paragraph
             if (blank && !words.empty()) {
                 if (!first_paragraph) {
                     std::cout << '\n';
@@ -477,6 +494,7 @@ namespace {
             }
         }
 
+        //processing the final paragraph even if the input does not end with a blank line
         if (!words.empty()) {
             if (!first_paragraph) {
                 std::cout << '\n';
@@ -502,6 +520,7 @@ namespace {
 
 int main(int arg_count, char** arg_vector) {
 
+    //parsing and validating all cli configuration before processing the input.
     Options options = parse_argument(arg_count, arg_vector);
 
     try {
