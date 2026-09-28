@@ -25,13 +25,21 @@ CMake 3.15 or later
 
 **How to Build with CMake**
 
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+Windows
+cmake -S . -B build
 
 cmake --build build --config Release
 
 Change directory to the \build\release [this is where the cli will be run from]
 
 The executable is build\release\kpcli.
+
+Other
+Change to the project directory
+
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+
+cmake --build build
 
 ---
 
